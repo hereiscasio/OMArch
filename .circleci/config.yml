@@ -5,5 +5,4 @@ workflows:
   build:
     jobs:
       - cypress/run:
-          start: npm run serve
-          wait-on: 'http-get://localhost:8080'
+          start: npm run ci:e2e
