@@ -1,7 +1,9 @@
 version: 2.1
 orbs:
-  cypress: cypress-io/cypress@1
+  cypress: cypress-io/cypress@1.5.0
 workflows:
   build:
     jobs:
-      - cypress/run
+      - cypress/run:
+          start: npm run serve
+          wait-on: 'http://localhost:8080'
