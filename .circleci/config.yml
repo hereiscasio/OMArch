@@ -5,4 +5,5 @@ workflows:
   build:
     jobs:
       - cypress/run:
+          yarn: true
           start: npm run ci:e2e
