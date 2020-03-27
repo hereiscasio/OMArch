@@ -7,9 +7,9 @@ describe('My First Test', () => {
 	cy.get('.router--about').click();
 	cy.contains('This is an about page')
   })
-  it('Visit page: about', () => {
-    cy.visit('/')
-	cy.get('.router--about').click();
-	cy.contains('This is an about page')
-  })
+//   it('Visit page: about', () => {
+//     cy.visit('/')
+// 	cy.get('.router--about').click();
+// 	cy.contains('This is an about page')
+//   })
 })
