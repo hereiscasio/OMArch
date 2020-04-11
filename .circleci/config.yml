@@ -33,9 +33,11 @@ workflows:
       # - cypress/run:
       #    executor: cypress/base-8
       - fake_job
-      - first_job
+
+      - first_job:
           requires:
             - fake_job
-      - second_job
+
+      - second_job:
           requires:
             - fake_job
