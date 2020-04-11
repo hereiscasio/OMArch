@@ -8,8 +8,8 @@ jobs:
       - checkout
       - run:
           name: Just Echo
-          command: echo "1st step: named command"
-      - run: echo "2nd step: anonymous command"
+          command: echo "1st step named command"
+      - run: echo "2nd step anonymous command"
 
 workflows:
   version: 2
