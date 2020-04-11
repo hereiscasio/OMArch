@@ -3,6 +3,13 @@ orbs:
   cypress: cypress-io/cypress@1
 
 jobs:
+
+  fake_job:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - run: echo "run fake_job lonely as real first job"
+
   first_job:
     docker:
       - image: circleci/node:latest
@@ -12,16 +19,23 @@ jobs:
           name: Just Echo
           command: echo "1st step named command"
       - run: echo "2nd step anonymous command"
+
   second_job:
     docker:
       - image: circleci/node:latest
     steps:
       - run: echo "run 1st and 2nd jobs concurrently"
+
 workflows:
   version: 2
   workflow_name:
     jobs:
       # - cypress/run:
       #    executor: cypress/base-8
+      - fake_job
       - first_job
+        requires:
+          - fake_job
       - second_job
+        requires:
+          - fake_job
