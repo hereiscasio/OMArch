@@ -12,7 +12,11 @@ jobs:
           name: Just Echo
           command: echo "1st step named command"
       - run: echo "2nd step anonymous command"
-
+  second_job:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - run: echo "run 1st and 2nd jobs concurrently"
 workflows:
   version: 2
   workflow_name:
