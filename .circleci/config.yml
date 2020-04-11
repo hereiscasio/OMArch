@@ -24,3 +24,4 @@ workflows:
       # - cypress/run:
       #    executor: cypress/base-8
       - first_job
+      - second_job
