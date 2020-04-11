@@ -1,8 +1,20 @@
 version: 2.1
 orbs:
   cypress: cypress-io/cypress@1
+
+jobs:
+  first_job:
+    steps:
+      - checkout
+      - run:
+          name: Just Echo
+          command: echo "1st step: named command"
+      - run: echo "2nd step: anonymous command"
+
 workflows:
-  build:
+  version: 2
+  workflow_name:
     jobs:
-      - cypress/run:
-          executor: cypress/base-8
+      # - cypress/run:
+      #    executor: cypress/base-8
+      - first_job
