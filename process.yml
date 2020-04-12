@@ -1,0 +1,423 @@
+# Orb 'circleci/node@2.0.1' resolved to 'circleci/node@2.0.1'
+# Orb 'azdevs/firebase-deploy@1.0.0' resolved to 'azdevs/firebase-deploy@1.0.0'
+# WARNING: Command 'deploy' in orbs.firebase-deploy.commands.deploy may override built-in CircleCI command 'deploy'
+version: 2
+jobs:
+  build:
+    docker:
+    - image: circleci/node:12.10.0
+    working_directory: ~/omarch
+    steps:
+    - checkout
+    - run:
+        command: |
+          # PLATFORM CHECK: mac vs. alpine vs. other linux
+
+          SYS_ENV_PLATFORM=linux
+          if uname -a | grep Darwin; then
+            SYS_ENV_PLATFORM=darwin
+          elif cat /etc/issue | grep Alpine; then
+            SYS_ENV_PLATFORM=alpine
+          fi
+
+          # FUNCTIONS
+
+          get_node_version () {
+            if [[ 12.10.0 == "" || 12.10.0 == "latest" || 12.10.0 == "current" ]]; then
+              NODE_ORB_INSTALL_VERSION=$(curl -Ls -o /dev/null -w %{url_effective} \
+                "https://github.com/nodejs/node/releases/latest" | sed 's:.*/::' | cut -d 'v' -f 2)
+              echo "Latest version of Node.js is $NODE_ORB_INSTALL_VERSION"
+            else
+              NODE_ORB_INSTALL_VERSION="12.10.0"
+              echo "Selected version of Node.js is $NODE_ORB_INSTALL_VERSION"
+            fi
+          }
+
+          installation_check () {
+            if command -v node; then
+
+              if node --version | grep "$NODE_ORB_INSTALL_VERSION"; then
+
+                echo "Node.js $NODE_ORB_INSTALL_VERSION is already installed"
+                exit 0
+              else
+                echo "A different version of Node.js is installed ($(node --version)); removing it"
+
+                $SUDO rm -rf "$(command -v node)"
+                $SUDO rm -rf "$(command -v node | sed -E 's|node||')/nodejs"
+
+                $SUDO rm -rf "$(command -v npm)"
+
+                $SUDO rm -rf \
+                  /usr/local/lib/node_modules \
+                  /usr/local/include/node_modules \
+                  /opt/local/lib/node_modules
+
+              fi
+            fi
+          }
+
+          # Install logic per platform
+
+          case $SYS_ENV_PLATFORM in
+            alpine)
+              echo "Install for alpine, or remove"
+            ;;
+            darwin)
+              if ! command -v gpg; then
+                HOMEBREW_NO_AUTO_UPDATE=1 brew install gnupg
+                HOMEBREW_NO_AUTO_UPDATE=1 brew install coreutils
+              fi
+            ;;
+          esac
+
+          if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+
+            get_node_version
+            installation_check
+
+            # Configure Security Keys for verification of Download
+
+            $SUDO curl \
+              --silent --show-error --location --fail --retry 3 \
+              https://raw.githubusercontent.com/nodejs/node/master/README.md | \
+              grep -E '[A-Z0-9]{40}' | \
+              sed -E 's/gpg --keyserver pool.sks-keyservers.net --recv-keys //g' | \
+              sed -E 's/(`|\$ )//g' > \
+              NODEJS_TRUSTED_RELEASE_KEYS
+
+            cat > KEYSERVERS << EOM
+            hkp://p80.pool.sks-keyservers.net:80
+            hkp://ipv4.pool.sks-keyservers.net
+            hkp://pgp.mit.edu:80
+            hkps://ha.pool.sks-keyservers.net
+            hkp://keyserver.ubuntu.com:80
+          EOM
+
+            echo "Importing Node.js trusted release keys..."
+            # https://stackoverflow.com/a/26217767
+            while read key; do
+              for keyserver in $(cat KEYSERVERS); do
+                tempName=$(mktemp)
+                gpg --status-fd 1 \
+                  --keyserver "$keyserver" --keyserver-options "timeout=1" \
+                  --recv-keys "$key" 1> "$tempName" 2>/dev/null || true
+                if [[ $(grep "^\[GNUPG\:\] IMPORT_OK "[[:digit:]]*" "$key"$" $tempName && \
+                  grep "^\[GNUPG\:\] IMPORT_RES 1" $tempName) ]]; then
+                  echo "Success! Imported $key from $keyserver"
+                  break
+                else
+                  continue
+                fi
+              done
+            done < NODEJS_TRUSTED_RELEASE_KEYS
+
+            $SUDO rm -f NODEJS_TRUSTED_RELEASE_KEYS KEYSERVERS
+
+            # Download binary
+            echo Node binary downloaded
+            echo "Downloading: https://nodejs.org/download/release/v$NODE_ORB_INSTALL_VERSION/node-v$NODE_ORB_INSTALL_VERSION-$SYS_ENV_PLATFORM-x64.tar.gz"
+            $SUDO curl -O \
+              --silent --show-error --location --fail --retry 3 \
+              "https://nodejs.org/download/release/v$NODE_ORB_INSTALL_VERSION/node-v$NODE_ORB_INSTALL_VERSION-$SYS_ENV_PLATFORM-x64.tar.gz"
+
+            # Download SHASUMS256 and sig
+            echo Fetching SHASUM256 verification
+            curl -O --silent --show-error --location --fail --retry 3 https://nodejs.org/dist/v$NODE_ORB_INSTALL_VERSION/SHASUMS256.txt
+            curl -O --silent --show-error --location --fail --retry 3 https://nodejs.org/dist/v$NODE_ORB_INSTALL_VERSION/SHASUMS256.txt.sig
+
+            # Verify checksum file sig
+            echo Verifing SHASUM256
+            gpg --verify SHASUMS256.txt.sig SHASUMS256.txt
+
+            # Verify checksum of binary
+            echo Verifing binary checksum
+            grep node-v$NODE_ORB_INSTALL_VERSION-$SYS_ENV_PLATFORM-x64.tar.gz SHASUMS256.txt | sha256sum -c -
+
+            # Install Binary
+            echo Installing Node binary
+            $SUDO tar -xzf "node-v$NODE_ORB_INSTALL_VERSION-$SYS_ENV_PLATFORM-x64.tar.gz" \
+              -C /usr/local \
+              --strip-components=1 --no-same-owner > /dev/null 2>&1
+
+            # Remove tar.gz
+            echo Cleaning up installation file
+            $SUDO rm -f "node-v$NODE_ORB_INSTALL_VERSION-$SYS_ENV_PLATFORM-x64.tar.gz"
+
+            if [[ ! -e /usr/local/bin/nodejs ]]; then
+              $SUDO ln -s /usr/local/bin/node /usr/local/bin/nodejs
+            fi
+
+          # test/verify version
+
+          if node --version | grep "$VERSION" > /dev/null; then
+            echo "Node.js $(node --version) has been installed to $(which node)"
+          else
+            echo "Something went wrong; the specified version of Node.js could not be installed"
+            exit 1
+          fi
+        name: Installing NodeJS 12.10.0
+    - run:
+        command: |
+          if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+
+          # FUNCTIONS
+          get_npm_version () {
+            if [[ latest == latest ]]; then
+              NPM_ORB_VERSION="$(npm view npm | sed -E 's|.*-||g' | grep latest | \
+                perl -pe 's/.*: //g' | perl -pe "s/'|,//g")"
+
+              echo "Latest version of NPM is $NPM_ORB_VERSION"
+            else
+              NPM_ORB_VERSION=latest
+
+              echo "Selected version of NPM is $NPM_ORB_VERSION"
+            fi
+          }
+
+          installation_check () {
+            if command -v npm > /dev/null 2>&1; then
+              if npm -v | grep "$NPM_ORB_VERSION" > /dev/null 2>&1; then
+                echo "NPM $NPM_ORB_VERSION is already installed"
+                exit 0
+              fi
+            fi
+          }
+
+          get_npm_version
+            installation_check
+
+            if [[ latest == latest ]]; then
+              $SUDO npm install -g npm@latest > /dev/null 2>&1 || \
+                npm install -g npm@latest > /dev/null 2>&1
+            else
+              $SUDO npm install -g "npm@$NPM_ORB_VERSION" > /dev/null 2>&1 || \
+                npm install -g "npm@$NPM_ORB_VERSION" > /dev/null 2>&1
+            fi
+
+            # test/verify version
+            if npm -v | grep "$NPM_ORB_VERSION" > /dev/null 2>&1; then
+              echo "Success! NPM $(npm -v) has been installed to $(which npm)"
+            else
+              echo "Something went wrong; the specified version of NPM could not be installed"
+              exit 1
+            fi
+        name: Install NPM
+    - run:
+        command: |
+          if [[ $EUID == 0 ]]; then export SUDO=""; else export SUDO="sudo"; fi
+
+          # FUNCTIONS
+          get_yarn_version () {
+            if [[ "" == "" ]]; then
+              YARN_ORB_VERSION=$(curl -Ls -o /dev/null -w %{url_effective} \
+                "https://github.com/yarnpkg/yarn/releases/latest" | sed 's:.*/::' | cut -d 'v' -f 2 | cut -d 'v' -f 2)
+              echo "Latest version of Yarn is $YARN_ORB_VERSION"
+            else
+              YARN_ORB_VERSION=
+
+              echo "Selected version of Yarn is $YARN_ORB_VERSION"
+            fi
+          }
+
+          installation_check () {
+            echo "Checking if YARN is already installed..."
+            if command -v yarn > /dev/null 2>&1; then
+              if yarn --version | grep "$YARN_ORB_VERSION" > /dev/null 2>&1; then
+                echo "Yarn $YARN_ORB_VERSION is already installed"
+                exit 0
+              else
+                echo "A different version of Yarn is installed ($(yarn --version)); removing it"
+
+                if uname -a | grep Darwin > /dev/null 2>&1; then
+                  brew uninstall yarn > /dev/null 2>&1
+                elif cat /etc/issue | grep Alpine > /dev/null 2>&1; then
+                  apk del yarn > /dev/null 2>&1
+                elif cat /etc/issue | grep Debian > /dev/null 2>&1; then
+                  $SUDO apt-get remove yarn > /dev/null 2>&1 && \
+                    $SUDO apt-get purge yarn > /dev/null 2>&1
+                elif cat /etc/issue | grep Ubuntu > /dev/null 2>&1; then
+                  $SUDO apt-get remove yarn > /dev/null 2>&1 && \
+                    $SUDO apt-get purge yarn > /dev/null 2>&1
+                elif command -v yum > /dev/null 2>&1; then
+                  yum remove yarn > /dev/null 2>&1
+                fi
+
+                $SUDO rm -rf "$HOME/.yarn" > /dev/null 2>&1
+                $SUDO rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg > /dev/null 2>&1
+              fi
+            fi
+          }
+
+          get_yarn_version
+          installation_check
+
+          # install yarn
+          echo "Installing YARN v$YARN_ORB_VERSION"
+          curl -L -o yarn.tar.gz --silent "https://yarnpkg.com/downloads/$YARN_ORB_VERSION/yarn-v$YARN_ORB_VERSION.tar.gz"
+
+          $SUDO tar -xzf yarn.tar.gz && rm yarn.tar.gz
+
+          $SUDO mkdir -p /opt/yarn
+          $SUDO mv yarn-v${YARN_ORB_VERSION}/* /opt/yarn
+
+          $SUDO rm -rf "yarn-v${YARN_ORB_VERSION}"
+
+          $SUDO chmod 777 "/opt/yarn"
+
+          $SUDO ln -s /opt/yarn/bin/yarn /usr/local/bin/yarn
+          $SUDO ln -s /opt/yarn/bin/yarnpkg /usr/local/bin/yarnpkg
+          $SUDO ln -s /opt/yarn/bin/yarn.js /usr/local/bin/yarn.js
+
+          $SUDO mkdir -p ~/.config
+
+          if uname -a | grep Darwin; then
+            $SUDO chown -R "$USER:$GROUP" ~/.config
+            $SUDO chown -R "$USER:$GROUP" /opt/yarn
+          else
+            $SUDO chown -R "$(whoami):$(whoami)" /opt/yarn
+            $SUDO chown -R "$(whoami):$(whoami)" ~/.config
+          fi
+
+          # test/verify version
+          echo "Verifying YARN install"
+          if yarn --version | grep "$YARN_ORB_VERSION" > /dev/null 2>&1; then
+            echo "Success! Yarn $(yarn --version) has been installed to $(which yarn)"
+          else
+            echo "Something went wrong; the specified version of Yarn could not be installed"
+            exit 1
+          fi
+        name: Install Yarn
+    - run:
+        name: Install Packages
+        command: yarn install
+    - run:
+        name: Build App
+        command: yarn build
+    - run:
+        name: Install Firebase Tools
+        command: npm install --prefix=./firebase-deploy firebase-tools
+    - run:
+        name: Deploy to Firebase
+        command: ./firebase-deploy/node_modules/.bin/firebase deploy --token=$FIREBASE_DEPLOY_TOKEN -P default
+    - run:
+        name: Deploy App
+        command: ./node_modules/.bin/firebase deploy --token "$FIREBASE_TOKEN" --only hosting
+workflows:
+  version: 2
+  workflow_name:
+    jobs:
+    - build
+
+# Original config.yml file:
+# version: 2.1
+# orbs:
+#   #cypress: cypress-io/cypress@1.19.1
+#   node: circleci/node@2.0.1
+#   firebase-deploy: azdevs/firebase-deploy@1.0.0
+# 
+# # references:
+# #   container_config: $container_config
+# #     docker: # it uses the docker executor
+# #       - image: circleci/node:latest
+# #     working_dirctory: ~/omarch
+# 
+# # references:
+# #   container_config: &container_config
+# #     docker:
+# #       - image: 'cimg/base:stable'
+# #     working_directory: ~/omarch
+# 
+# jobs:
+#   # install_node:
+#   #   <<: *container_config
+#   #   steps:
+#   #     # - checkout
+#   #     - node/install:
+#   #         install-yarn: true
+#   #         node-version: 12.10.0
+#   #     - run: node --version
+# 
+#   # checkout_code:
+#   #   <<: *container_config
+#   build:
+#     docker:
+#       # - image: 'cimg/base:stable'
+#       - image: circleci/node:12.10.0
+#     # ISSUE: Directory (/home/circleci/omarch) you are trying to checkout to is not empty and not a git repository
+#     working_directory: ~/omarch
+#     steps:
+#       - checkout
+#       - node/install:
+#           install-yarn: true
+#           node-version: 12.10.0
+#       - run:
+#           name: Install Packages
+#           command: yarn install
+#       - run:
+#           name: Build App
+#           command: yarn build
+#       - firebase-deploy/deploy:
+#           token: $FIREBASE_DEPLOY_TOKEN
+#       - run:
+#           name: Deploy App
+#           command: ./node_modules/.bin/firebase deploy --token \"$FIREBASE_TOKEN\" --only hosting
+# 
+# 
+#   # fake_job:
+#   #   docker: # it uses the docker executor
+#   #     - image: circleci/node:latest
+#   #   working_directory: ~/omarch
+#   #   steps:
+#   #     - checkout
+#   #     - run:
+#   #         name: update-npm
+#   #         command: 'sudo npm install -g npm@latest'
+#   #     - restore_cache:
+#   #         key: dependency-cache-{{ checksum \"package-lock.json\" }}
+#   #     - run:
+#   #         name: install-npm
+#   #         command: npm install
+#   #     - save_cache:
+#   #         key: dependency-cache-{{ checksum \"package-lock.json\" }}
+#   #         paths:
+#   #           - ./node_modules
+#   #     - run: echo \"finish fake_job\"
+# 
+# 
+# 
+#   # first_job:
+#   #   docker:
+#   #     - image: circleci/node:latest
+#   #   steps:
+#   #     - checkout
+#   #     - run:
+#   #         name: Just Echo
+#   #         command: echo \"1st step named command\"
+#   #     - run: echo \"2nd step anonymous command\"
+#   #     # - run:
+#   #     #    name: Generate code coverage
+#   #     #    command: './node_modules/.bin/nyc report --reporter=text-lcov'
+# 
+#   # second_job:
+#   #   docker:
+#   #     - image: circleci/node:latest
+#   #   steps:
+#   #     - run: echo \"run 1st and 2nd jobs concurrently\"
+# 
+# workflows:
+#   version: 2
+#   workflow_name:
+#     jobs:
+#       # - cypress/run:
+#       #    executor: cypress/base-8
+#       # - fake_job
+#       # - install_node
+#       - build
+#       # - first_job:
+#       #     requires:
+#       #       - fake_job
+# 
+#       # - second_job:
+#       #     requires:
+#       #       - fake_job

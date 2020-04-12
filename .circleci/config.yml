@@ -2,6 +2,7 @@ version: 2.1
 orbs:
   #cypress: cypress-io/cypress@1.19.1
   node: circleci/node@2.0.1
+  firebase-deploy: azdevs/firebase-deploy@1.0.0
 
 # references:
 #   container_config: $container_config
@@ -9,27 +10,67 @@ orbs:
 #       - image: circleci/node:latest
 #     working_dirctory: ~/omarch
 
-jobs:
+# references:
+#   container_config: &container_config
+#     docker:
+#       - image: 'cimg/base:stable'
+#     working_directory: ~/omarch
 
-  fake_job:
-    docker: # it uses the docker executor
-      - image: circleci/node:latest
-    # working_directory: ~/omarch
+jobs:
+  # install_node:
+  #   <<: *container_config
+  #   steps:
+  #     # - checkout
+  #     - node/install:
+  #         install-yarn: true
+  #         node-version: 12.10.0
+  #     - run: node --version
+
+  # checkout_code:
+  #   <<: *container_config
+  build:
+    docker:
+      # - image: 'cimg/base:stable'
+      - image: circleci/node:12.10.0
+    # ISSUE: Directory (/home/circleci/omarch) you are trying to checkout to is not empty and not a git repository
+    working_directory: ~/omarch
     steps:
       - checkout
+      - node/install:
+          install-yarn: true
+          node-version: 12.10.0
       - run:
-          name: update-npm
-          command: 'sudo npm install -g npm@latest'
-      - restore_cache:
-          key: dependency-cache-{{ checksum "package-lock.json" }}
+          name: Install Packages
+          command: yarn install
       - run:
-          name: install-npm
-          command: npm install
-      - save_cache:
-          key: dependency-cache-{{ checksum "package-lock.json" }}
-          paths:
-            - ./node_modules
-      - run: echo "finish fake_job"
+          name: Build App
+          command: yarn build
+      - firebase-deploy/deploy:
+          token: $FIREBASE_DEPLOY_TOKEN
+      - run:
+          name: Deploy App
+          command: ./node_modules/.bin/firebase deploy --token "$FIREBASE_DEPLOY_TOKEN" --only hosting
+
+
+  # fake_job:
+  #   docker: # it uses the docker executor
+  #     - image: circleci/node:latest
+  #   working_directory: ~/omarch
+  #   steps:
+  #     - checkout
+  #     - run:
+  #         name: update-npm
+  #         command: 'sudo npm install -g npm@latest'
+  #     - restore_cache:
+  #         key: dependency-cache-{{ checksum "package-lock.json" }}
+  #     - run:
+  #         name: install-npm
+  #         command: npm install
+  #     - save_cache:
+  #         key: dependency-cache-{{ checksum "package-lock.json" }}
+  #         paths:
+  #           - ./node_modules
+  #     - run: echo "finish fake_job"
 
 
 
@@ -58,8 +99,9 @@ workflows:
     jobs:
       # - cypress/run:
       #    executor: cypress/base-8
-      - fake_job
-
+      # - fake_job
+      # - install_node
+      - build
       # - first_job:
       #     requires:
       #       - fake_job

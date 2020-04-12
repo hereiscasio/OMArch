@@ -1,3 +1,4 @@
+dist/
 node_modules
 *.log
 *.aes
@@ -9,3 +10,4 @@ cypress/fixtures/users.json
 .history
 .vscode
 env
+.firebase
