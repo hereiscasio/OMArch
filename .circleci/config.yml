@@ -1,30 +1,56 @@
 version: 2.1
 orbs:
-  cypress: cypress-io/cypress@1
+  #cypress: cypress-io/cypress@1.19.1
+  node: circleci/node@2.0.1
+
+# references:
+#   container_config: $container_config
+#     docker: # it uses the docker executor
+#       - image: circleci/node:latest
+#     working_dirctory: ~/omarch
 
 jobs:
 
   fake_job:
-    docker:
+    docker: # it uses the docker executor
       - image: circleci/node:latest
-    steps:
-      - run: echo "run fake_job lonely as real first job"
-
-  first_job:
-    docker:
-      - image: circleci/node:latest
+    # working_directory: ~/omarch
     steps:
       - checkout
       - run:
-          name: Just Echo
-          command: echo "1st step named command"
-      - run: echo "2nd step anonymous command"
+          name: update-npm
+          command: 'sudo npm install -g npm@latest'
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package-lock.json" }}
+      - run:
+          name: install-npm
+          command: npm install
+      - save_cache:
+          key: dependency-cache-{{ checksum "package-lock.json" }}
+          paths:
+            - ./node_modules
+      - run: echo "finish fake_job"
 
-  second_job:
-    docker:
-      - image: circleci/node:latest
-    steps:
-      - run: echo "run 1st and 2nd jobs concurrently"
+
+
+  # first_job:
+  #   docker:
+  #     - image: circleci/node:latest
+  #   steps:
+  #     - checkout
+  #     - run:
+  #         name: Just Echo
+  #         command: echo "1st step named command"
+  #     - run: echo "2nd step anonymous command"
+  #     # - run:
+  #     #    name: Generate code coverage
+  #     #    command: './node_modules/.bin/nyc report --reporter=text-lcov'
+
+  # second_job:
+  #   docker:
+  #     - image: circleci/node:latest
+  #   steps:
+  #     - run: echo "run 1st and 2nd jobs concurrently"
 
 workflows:
   version: 2
@@ -34,10 +60,10 @@ workflows:
       #    executor: cypress/base-8
       - fake_job
 
-      - first_job:
-          requires:
-            - fake_job
+      # - first_job:
+      #     requires:
+      #       - fake_job
 
-      - second_job:
-          requires:
-            - fake_job
+      # - second_job:
+      #     requires:
+      #       - fake_job
