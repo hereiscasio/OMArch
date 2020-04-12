@@ -2,7 +2,6 @@ version: 2.1
 orbs:
   #cypress: cypress-io/cypress@1.19.1
   node: circleci/node@2.0.1
-  firebase-deploy: azdevs/firebase-deploy@1.0.0
 
 # references:
 #   container_config: $container_config
@@ -45,8 +44,6 @@ jobs:
       - run:
           name: Build App
           command: yarn build
-      - firebase-deploy/deploy:
-          token: $FIREBASE_DEPLOY_TOKEN
       - run:
           name: Deploy App
           command: ./node_modules/.bin/firebase deploy --token "$FIREBASE_DEPLOY_TOKEN" --only hosting
