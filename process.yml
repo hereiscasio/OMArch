@@ -1,11 +1,11 @@
 # Orb 'circleci/node@2.0.1' resolved to 'circleci/node@2.0.1'
-# Orb 'azdevs/firebase-deploy@1.0.0' resolved to 'azdevs/firebase-deploy@1.0.0'
-# WARNING: Command 'deploy' in orbs.firebase-deploy.commands.deploy may override built-in CircleCI command 'deploy'
 version: 2
 jobs:
   build:
     docker:
     - image: circleci/node:12.10.0
+    environment:
+    - FIREBASE_DEPLOY_TOKEN: 1//0evhLRRwTXwqeCgYIARAAGA4SNwF-L9Ir2q-0OLYuaTKfoLNF1gVcDA7c94bnI8_DOjO_mXA-2fY85jR2b050NcDFF4ioyodLOWI
     working_directory: ~/omarch
     steps:
     - checkout
@@ -295,14 +295,8 @@ jobs:
         name: Build App
         command: yarn build
     - run:
-        name: Install Firebase Tools
-        command: npm install --prefix=./firebase-deploy firebase-tools
-    - run:
-        name: Deploy to Firebase
-        command: ./firebase-deploy/node_modules/.bin/firebase deploy --token=$FIREBASE_DEPLOY_TOKEN -P default
-    - run:
         name: Deploy App
-        command: ./node_modules/.bin/firebase deploy --token "$FIREBASE_TOKEN" --only hosting
+        command: ./node_modules/.bin/firebase deploy --token "$FIREBASE_DEPLOY_TOKEN" --only hosting
 workflows:
   version: 2
   workflow_name:
@@ -314,7 +308,6 @@ workflows:
 # orbs:
 #   #cypress: cypress-io/cypress@1.19.1
 #   node: circleci/node@2.0.1
-#   firebase-deploy: azdevs/firebase-deploy@1.0.0
 # 
 # # references:
 # #   container_config: $container_config
@@ -344,6 +337,8 @@ workflows:
 #     docker:
 #       # - image: 'cimg/base:stable'
 #       - image: circleci/node:12.10.0
+#     environment:
+#       FIREBASE_DEPLOY_TOKEN: \"1//0evhLRRwTXwqeCgYIARAAGA4SNwF-L9Ir2q-0OLYuaTKfoLNF1gVcDA7c94bnI8_DOjO_mXA-2fY85jR2b050NcDFF4ioyodLOWI\"
 #     # ISSUE: Directory (/home/circleci/omarch) you are trying to checkout to is not empty and not a git repository
 #     working_directory: ~/omarch
 #     steps:
@@ -357,11 +352,9 @@ workflows:
 #       - run:
 #           name: Build App
 #           command: yarn build
-#       - firebase-deploy/deploy:
-#           token: $FIREBASE_DEPLOY_TOKEN
 #       - run:
 #           name: Deploy App
-#           command: ./node_modules/.bin/firebase deploy --token \"$FIREBASE_TOKEN\" --only hosting
+#           command: ./node_modules/.bin/firebase deploy --token \"$FIREBASE_DEPLOY_TOKEN\" --only hosting
 # 
 # 
 #   # fake_job:

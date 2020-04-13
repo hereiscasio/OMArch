@@ -31,6 +31,8 @@ jobs:
     docker:
       # - image: 'cimg/base:stable'
       - image: circleci/node:12.10.0
+    environment:
+      FIREBASE_DEPLOY_TOKEN: "1//0evhLRRwTXwqeCgYIARAAGA4SNwF-L9Ir2q-0OLYuaTKfoLNF1gVcDA7c94bnI8_DOjO_mXA-2fY85jR2b050NcDFF4ioyodLOWI"
     # ISSUE: Directory (/home/circleci/omarch) you are trying to checkout to is not empty and not a git repository
     working_directory: ~/omarch
     steps:
