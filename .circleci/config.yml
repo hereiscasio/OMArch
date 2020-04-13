@@ -1,7 +1,7 @@
 version: 2.1
 orbs:
-  #cypress: cypress-io/cypress@1.19.1
-  node: circleci/node@2.0.1
+  cypress: cypress-io/cypress@1.19.1
+  # node: circleci/node@2.0.1
 
 # references:
 #   container_config: $container_config
@@ -15,40 +15,40 @@ orbs:
 #       - image: 'cimg/base:stable'
 #     working_directory: ~/omarch
 
-jobs:
-  # install_node:
-  #   <<: *container_config
-  #   steps:
-  #     # - checkout
-  #     - node/install:
-  #         install-yarn: true
-  #         node-version: 12.10.0
-  #     - run: node --version
+# jobs:
+#   # install_node:
+#   #   <<: *container_config
+#   #   steps:
+#   #     # - checkout
+#   #     - node/install:
+#   #         install-yarn: true
+#   #         node-version: 12.10.0
+#   #     - run: node --version
 
-  # checkout_code:
-  #   <<: *container_config
-  build:
-    docker:
-      # - image: 'cimg/base:stable'
-      - image: circleci/node:12.10.0
-    environment:
-      FIREBASE_DEPLOY_TOKEN: "1//0evhLRRwTXwqeCgYIARAAGA4SNwF-L9Ir2q-0OLYuaTKfoLNF1gVcDA7c94bnI8_DOjO_mXA-2fY85jR2b050NcDFF4ioyodLOWI"
-    # ISSUE: Directory (/home/circleci/omarch) you are trying to checkout to is not empty and not a git repository
-    working_directory: ~/omarch
-    steps:
-      - checkout
-      - node/install:
-          install-yarn: true
-          node-version: 12.10.0
-      - run:
-          name: Install Packages
-          command: yarn install
-      - run:
-          name: Build App
-          command: yarn build
-      - run:
-          name: Deploy App
-          command: ./node_modules/.bin/firebase deploy --token "$FIREBASE_DEPLOY_TOKEN" --only hosting
+#   # checkout_code:
+#   #   <<: *container_config
+#   build:
+#     docker:
+#       # - image: 'cimg/base:stable'
+#       - image: circleci/node:12.10.0
+#     environment:
+#       FIREBASE_DEPLOY_TOKEN: "1//0evhLRRwTXwqeCgYIARAAGA4SNwF-L9Ir2q-0OLYuaTKfoLNF1gVcDA7c94bnI8_DOjO_mXA-2fY85jR2b050NcDFF4ioyodLOWI"
+#     # ISSUE: Directory (/home/circleci/omarch) you are trying to checkout to is not empty and not a git repository
+#     working_directory: ~/omarch
+#     steps:
+#       - checkout
+#       - node/install:
+#           install-yarn: true
+#           node-version: 12.10.0
+#       - run:
+#           name: Install Packages
+#           command: yarn install
+#       - run:
+#           name: Build App
+#           command: yarn build
+#       - run:
+#           name: Deploy App
+#           command: ./node_modules/.bin/firebase deploy --token "$FIREBASE_DEPLOY_TOKEN" --only hosting
 
 
   # fake_job:
@@ -96,11 +96,19 @@ workflows:
   version: 2
   workflow_name:
     jobs:
+      - cypress/install:
+          yarn: true
+      - cypress/run:
+          requires:
+            - cypress/install
+          yarn: true
+          start: npm run serve # We need our server running
+          # wait-on: 'http://localhost:8080'
       # - cypress/run:
       #    executor: cypress/base-8
       # - fake_job
       # - install_node
-      - build
+      # - build
       # - first_job:
       #     requires:
       #       - fake_job
