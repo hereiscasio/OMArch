@@ -19,7 +19,7 @@
 		"@vue/cli-plugin-e2e-cypress": "~4.2.0",
 		"@vue/cli-plugin-router": "~4.2.0",
 		"@vue/cli-plugin-vuex": "~4.2.0",
-		"@vue/cli-service": "~4.2.0",
+		"@vue/cli-service": "~5.0.8",
 		"firebase-tools": "^8.0.2",
 		"sass": "^1.25.0",
 		"sass-loader": "^8.0.2",
